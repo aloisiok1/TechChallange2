@@ -19,7 +19,7 @@ from statsmodels.tsa.stattools import acf, pacf
 import warnings
 warnings.filterwarnings('ignore')
 
-df=pd.read_csv("/content/Dados Históricos - Ibovespa_1ano(diario).csv", sep=",")
+df = pd.read_csv("/content/Dados Históricos - Ibovespa_4anos.csv", sep=",")
 df.head(25)
 
 df.info()
@@ -30,21 +30,26 @@ df.info()
 
 df.head(25)
 
-def convert_to_float(value):
-    return float(value.replace("M", "").replace(",", "."))
+df = df.rename(columns={"Vol.":"Vol", "Var%":"Var", "Mínima": "Minima", "Máxima": "Maxima", "Último":"Fechamento"})
 
-df["Vol."] = df["Vol."].apply(convert_to_float)
+def convert_to_float(value):
+    if "M" in value:
+        return float(value.replace("M", "").replace(",", ".")) * 1000000
+    elif "K" in value:
+        return float(value.replace("K", "").replace(",", ".")) * 1000
+    else:
+        return float(value.replace(",", "."))
+
+df["Vol"] = df["Vol"].apply(convert_to_float)
 
 print(df)
 
 def convert_to_floats(value):
     return float(value.replace("%", "").replace(",", "."))
 
-df["Var%"] = df["Var%"].apply(convert_to_floats)
+df["Var"] = df["Var"].apply(convert_to_floats)
 
 print(df)
-
-df = df.rename(columns={"Vol.":"Vol", "Var%":"Var", "Mínima": "Minima", "Máxima": "Maxima", "Último":"Fechamento"})
 
 df.describe()
 
@@ -191,7 +196,7 @@ https://facebook.github.io/prophet/docs/quick_start.html#python-api
 
 from prophet import Prophet
 
-df_prof=pd.read_csv("/content/Dados Históricos - Ibovespa_1ano(diario).csv", sep=",")
+df_prof=pd.read_csv("/content/Dados Históricos - Ibovespa_4anos.csv", sep=",")
 df_prof.head()
 
 df_prof = df_prof[['Data', 'Último']]
@@ -222,4 +227,65 @@ plot_components_plotly(df_prof1, forecast)
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 import pandas as pd
+
+"""#Forecasting"""
+
+df_1=pd.read_csv("/content/Dados Históricos - Ibovespa_4anos.csv", sep=",")
+df_1.head()
+
+def convert_to_float(value):
+    if "M" in value:
+        return float(value.replace("M", "").replace(",", ".")) * 10000
+    elif "K" in value:
+        return float(value.replace("K", "").replace(",", ".")) * 10
+    else:
+        return float(value.replace(",", "."))
+
+df_1["Vol."] = df_1["Vol."].apply(convert_to_float)
+
+print(df_1)
+
+df_1.describe()
+
+df_1.info()
+
+df_1.rename(columns={"Vol.": "Volume"}, inplace=True)
+
+df_1.head()
+
+df_1 = df_1[["Data", "Último", "Volume"]]
+df_1 = df_1.rename(columns={"Data": "ds", "Último": "y", "Volume": "unique_id"})
+
+df_1
+
+df_1['ds'] = pd.to_datetime(df_1['ds'])
+
+df_1.info()
+
+!pip install statsforecast
+
+df_1.tail()
+
+treino = df_1.loc[df_1["ds"]<"2022-10-01"]
+valid = df_1.loc[(df_1["ds"]>="2022-10-01")&(df_1["ds"]<"2023-02-18")]
+h = valid["ds"].nunique() #validação do período "valid" (3meses)
+
+h
+
+def wmape(y_true, y_pred):
+  return np.abs(y_true-y_pred).sum()/np.abs(y_true).sum()
+
+from statsforecast import StatsForecast
+from statsforecast.models import Naive, SeasonalNaive, SeasonalWindowAverage, AutoARIMA
+
+model = StatsForecast(models=[Naive()], freq="D", n_jobs=-1)
+model.fit(treino)
+
+forecast_df = model.predict(h=h, level=[90])
+forecast_df = forecast_df.reset_index().merge(valid, on=["ds", "unique_id"], how="left")
+
+wmape1 = wmape(forecast_df["y"].values, forecast_df["Naive"].values)
+print(f"WMAPE: {wmape1:.2%}")
+
+model.plot(treino, forecast_df, level=[90], unique_ids=forecast_df["unique_id"], engine="matplotlib", max_insample_length=90)
 
