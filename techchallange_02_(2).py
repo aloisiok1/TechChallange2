@@ -208,7 +208,7 @@ df_prof
 df_prof1 = Prophet()
 df_prof1.fit(df_prof)
 
-future = df_prof1.make_future_dataframe(periods=365)
+future = df_prof1.make_future_dataframe(periods=1095)
 future.tail()
 
 forecast = df_prof1.predict(future)
@@ -227,6 +227,18 @@ plot_components_plotly(df_prof1, forecast)
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 import pandas as pd
+
+from prophet.diagnostics import performance_metrics
+from prophet.diagnostics import cross_validation
+df_cv = cross_validation(df_prof1, initial='395 days', period='180 days', horizon = '1000 days')
+
+df_cv.head()
+
+df_p = performance_metrics(df_cv)
+df_p.head()
+
+from prophet.plot import plot_cross_validation_metric
+fig = plot_cross_validation_metric(df_cv, metric='mape')
 
 """#Forecasting"""
 
