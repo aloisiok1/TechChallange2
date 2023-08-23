@@ -22,9 +22,13 @@ warnings.filterwarnings('ignore')
 df = pd.read_csv("/content/Dados Históricos - Ibovespa_4anos.csv", sep=",")
 df.head(25)
 
-df.info()
+from datetime import datetime
+def converterData(data):
+  return datetime.strptime(data,'%d.%m.%Y')
 
-df['Data'] = pd.to_datetime(df['Data'])
+df.head(25)
+
+df['Data'] = df['Data'].apply(converterData)
 
 df.info()
 
@@ -199,6 +203,8 @@ from prophet import Prophet
 df_prof=pd.read_csv("/content/Dados Históricos - Ibovespa_4anos.csv", sep=",")
 df_prof.head()
 
+df_prof['Data'] = df_prof['Data'].apply(converterData)
+
 df_prof = df_prof[['Data', 'Último']]
 df_prof
 
@@ -235,10 +241,15 @@ df_cv = cross_validation(df_prof1, initial='395 days', period='180 days', horizo
 df_cv.head()
 
 df_p = performance_metrics(df_cv)
-df_p.head()
+df_p.head(25)
 
 from prophet.plot import plot_cross_validation_metric
 fig = plot_cross_validation_metric(df_cv, metric='mape')
+
+def mape(ytrue,ypred): # erro médio percentual absoluto
+    ytrue = ytrue.values
+    ypred = ypred.values
+    return np.mean(nb.abs((ytrue - ypred)/ ytrue))
 
 """#Forecasting"""
 
@@ -257,6 +268,8 @@ df_1["Vol."] = df_1["Vol."].apply(convert_to_float)
 
 print(df_1)
 
+df_1['Data'] = df_1['Data'].apply(converterData)
+
 df_1.describe()
 
 df_1.info()
@@ -265,12 +278,10 @@ df_1.rename(columns={"Vol.": "Volume"}, inplace=True)
 
 df_1.head()
 
-df_1 = df_1[["Data", "Último", "Volume"]]
-df_1 = df_1.rename(columns={"Data": "ds", "Último": "y", "Volume": "unique_id"})
+df_1 = df_1[["Data", "Último"]]
+df_1 = df_1.rename(columns={"Data": "ds", "Último": "y"})
 
 df_1
-
-df_1['ds'] = pd.to_datetime(df_1['ds'])
 
 df_1.info()
 
@@ -278,9 +289,15 @@ df_1.info()
 
 df_1.tail()
 
+df_1["unique_id"] = "Ibovespa"
+
+df_1.head()
+
 treino = df_1.loc[df_1["ds"]<"2022-10-01"]
 valid = df_1.loc[(df_1["ds"]>="2022-10-01")&(df_1["ds"]<"2023-02-18")]
 h = valid["ds"].nunique() #validação do período "valid" (3meses)
+
+treino.head()
 
 h
 
@@ -299,5 +316,124 @@ forecast_df = forecast_df.reset_index().merge(valid, on=["ds", "unique_id"], how
 wmape1 = wmape(forecast_df["y"].values, forecast_df["Naive"].values)
 print(f"WMAPE: {wmape1:.2%}")
 
-model.plot(treino, forecast_df, level=[90], unique_ids=forecast_df["unique_id"], engine="matplotlib", max_insample_length=90)
+model.plot(treino, forecast_df, level=[90], unique_ids=["Ibovespa"], engine="matplotlib", max_insample_length=90)
 
+forecast_df.head(25)
+
+"""#Scikt learn"""
+
+df.head()
+
+df.info()
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+
+X = df.drop(columns=['Fechamento'])
+y = df['Fechamento']
+
+# Dividir os dados em conjunto de treinamento e teste
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Criar e treinar o modelo de regressão linear
+modelo = LinearRegression()
+modelo.fit(X_train, y_train)
+
+# Realizar previsões no conjunto de teste
+y_pred = modelo.predict(X_test)
+
+# Avaliar a acurácia do modelo usando o coeficiente de determinação (R²)
+acuracia = r2_score(y_test, y_pred)
+print("Acurácia do Modelo (R²):", acuracia)
+
+"""#stats Model"""
+
+import pandas as pd
+import statsmodels.api as sm
+
+X = df.drop(columns=['Fechamento'])
+y = df['Fechamento']
+
+# Adicionar uma coluna de constante aos atributos (intercepto)
+X = sm.add_constant(X)
+
+# Dividir os dados em conjunto de treinamento e teste (opcional, depende do caso)
+# Aqui você pode usar a mesma abordagem de divisão de dados que mencionamos anteriormente
+
+# Criar o modelo de regressão
+modelo = sm.OLS(y, X).fit()
+
+# Obter as previsões do modelo
+y_pred = modelo.predict(X)
+
+# Calcular a acurácia (coeficiente de determinação R²)
+acuracia = modelo.rsquared
+print("Acurácia do Modelo (R²):", acuracia)
+
+"""#prophet"""
+
+import pandas as pd
+from prophet import Prophet
+from prophet.diagnostics import performance_metrics
+
+df_1.head()
+
+df_1 = df_1.drop(columns=['unique_id'])
+
+df_1
+
+df_1['ds'] = pd.to_datetime(df_1['ds'])
+
+df_1.head()
+
+!pip install --upgrade prophet
+
+from prophet import Prophet
+
+df_2 = Prophet()
+df_2.fit(df_1)
+
+future = df_2.make_future_dataframe(periods=1095)
+future.tail()
+
+forecast = df_2.predict(future)
+forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail()
+
+fig1 = df_2.plot(forecast)
+
+fig2 = df_2.plot_components(forecast)
+
+from prophet.plot import plot_plotly, plot_components_plotly
+
+plot_plotly(df_2, forecast)
+
+df_cv = cross_validation(df_2, initial='395 days', period='180 days', horizon = '1000 days')
+
+df_cv
+
+# Criar um DataFrame de datas para as quais você deseja fazer previsões
+futuro = df_2.make_future_dataframe(periods=30)  # Exemplo: 30 dias no futuro
+
+# Fazer as previsões
+previsoes = future.predict(futuro)
+
+# Avaliar a qualidade das previsões usando MAPE
+metricas = performance_metrics(previsoes)
+mape = metricas['mape'].mean()  # Valor médio do MAPE
+
+print("Média do MAPE:", mape)
+
+df
+
+"""#Arima"""
+
+from statsmodels.tsa.arima.model import ARIMA
+
+# Ajustar modelo ARIMA
+modelo_arima = ARIMA(df['Fechamento'], order=(p, d, q))
+resultado = modelo_arima.fit()
+
+# Fazer previsões
+previsoes_arima = resultado.predict(start=len(df), end=len(df) + n-1, typ='levels')
