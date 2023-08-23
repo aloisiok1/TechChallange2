@@ -320,7 +320,7 @@ model.plot(treino, forecast_df, level=[90], unique_ids=["Ibovespa"], engine="mat
 
 forecast_df.head(25)
 
-"""#Scikt learn"""
+"""#Scikt learn."""
 
 df.head()
 
