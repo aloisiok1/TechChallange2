@@ -463,4 +463,4 @@ plot_plotly(prophet, p)
 
 fig2 = prophet.plot_components(p)
 
-"""#Ao analisarmos com uma predição de 7 dias nós percebemos um erro de 1.4% apenas no modelo. Então assim entendemos que o modelo prophet com uma predição de 7 dias é o melhor modelo analisado pelo grupo."""
+"""#Fizemos várias análises com diferentes volumes de dados e chegamos ao melhor resultado. Ao analisarmos com uma predição de 7 dias nós percebemos um erro de 1.4% apenas no modelo. Então assim entendemos que o modelo prophet com uma predição de 7 dias é o melhor modelo analisado pelo grupo."""
